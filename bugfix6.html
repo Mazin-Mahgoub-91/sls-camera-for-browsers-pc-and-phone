@@ -1,0 +1,104 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>SLS USB Camera</title>
+<style>
+body{margin:0;background:#000;overflow:hidden;color:#0f0;font-family:tahoma}
+video,canvas{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
+#msg{position:absolute;top:30px;width:100%;text-align:center;font-size:20px;z-index:10;text-shadow:0 0 10px #0f0}
+#btn{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);padding:25px 50px;font-size:20px;background:#0f0;color:#000;border:none;border-radius:15px;z-index:20;font-weight:bold}
+#log{position:absolute;bottom:0;left:0;width:100%;max-height:100px;background:rgba(0,0,0,0.8);border-top:2px solid #0f0;padding:10px;font-size:13px;color:yellow;overflow-y:auto;z-index:20;text-align:right}
+.ok{color:#0f0}.err{color:#ff4444}
+</style>
+</head>
+<body>
+<div id="msg">اضغط الزر وشوف السحر</div>
+<button id="btn">شغل كاميرا USB</button>
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+<div id="log">جاهز للتشغيل...</div>
+
+<script type="importmap">
+{"imports":{"mediapipe":"https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/+esm"}}
+</script>
+
+<script type="module">
+import {Pose, POSE_CONNECTIONS} from 'mediapipe';
+import {drawConnectors, drawLandmarks} from 'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466861/+esm';
+import {Camera} from 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466861/+esm';
+
+const v = document.getElementById('video');
+const c = document.getElementById('canvas');
+const ctx = c.getContext('2d');
+const msg = document.getElementById('msg');
+const log = document.getElementById('log');
+const btn = document.getElementById('btn');
+
+const addLog = (t, cls='') => {
+  log.innerHTML += <div class="${cls}">${t}</div>;
+  log.scrollTop = log.scrollHeight;
+}
+
+const pose = new Pose({locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${f}`});
+pose.setOptions({modelComplexity:0,smoothLandmarks:true,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+pose.onResults(r=>{
+  msg.style.display='none';
+  c.width=v.videoWidth; c.height=v.videoHeight;
+  ctx.clearRect(0,0,c.width,c.height);
+  if(r.poseLandmarks){
+    drawConnectors(ctx,r.poseLandmarks,POSE_CONNECTIONS,{color:'#00FF00',lineWidth:4});
+    drawLandmarks(ctx,r.poseLandmarks,{color:'#FF0000',lineWidth:2,radius:4});
+  }
+});
+
+btn.onclick = async () => {
+  btn.disabled = true;
+  addLog('1. الزر اتضغط ✅', 'ok');
+
+  try {
+    // الخطوة السرية: نطلب كاميرا "أي شي" أول عشان الصلاحية
+    addLog('2. بطلب صلاحية الكاميرا من كروم...');
+    const tempStream = await navigator.mediaDevices.getUserMedia({video:true});
+    addLog('3. كروم وافق ✅', 'ok');
+
+    // نقفل المؤقتة طوالي
+    tempStream.getTracks().forEach(t=>t.stop());
+
+    // هسي نجيب الكاميرات الحقيقية بالأسماء
+    addLog('4. بفتش الكاميرات الموصلة...');
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d=>d.kind==='videoinput');
+
+    if(cams.length===0) throw new Error('ما في كاميرات');
+    addLog(5. لقيت ${cams.length} كاميرا: ${cams[0].label}, 'ok');
+
+    // نشغل أول كاميرا لقيناها - دي غالباً USB بتاعتك
+    addLog('6. بشغل الكاميرا...');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {deviceId: cams[0].deviceId}
+    });
+
+    v.srcObject = stream;
+    await v.play();
+    addLog('7. الفيديو شغال 📷', 'ok');
+
+    // نبدأ MediaPipe
+    const camera = new Camera(v, {
+      onFrame: async () => { await pose.send({image: v}); },
+      width: 1280, height: 720
+    });
+    camera.start();
+    addLog('8. MediaPipe شغال 🔥 حرك يدك', 'ok');
+    btn.style.display='none';
+
+  } catch(err) {
+    addLog('❌ خطأ: ' + err.name, 'err');
+    addLog(err.message, 'err');
+    btn.disabled = false;
+    console.error(err);
+  }
+}
+</script>
+</body>
+</html>
