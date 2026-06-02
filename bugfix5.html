@@ -1,0 +1,16 @@
+﻿<!DOCTYPE html>
+<html>
+<body style="background:#000;color:#0f0;text-align:center;padding:50px">
+<h1>اختبار الزر</h1>
+<button id="b" style="font-size:30px;padding:30px">اضغطني</button>
+<div id="r" style="margin-top:30px;font-size:20px"></div>
+
+<script>
+document.getElementById('b').onclick = () => {
+  alert('الزر شغال!');
+  document.getElementById('r').innerHTML = 'لو شايف الرسالة دي معناها الجافاسكريبت شغال';
+  console.log('الزر اتضغط');
+}
+</script>
+</body>
+</html>
