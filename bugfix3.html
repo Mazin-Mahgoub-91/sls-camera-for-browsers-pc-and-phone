@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>تشخيص الكاميرا USB</title>
+<style>
+body{background:#000;color:#0f0;font-family:monospace;padding:20px;text-align:center}
+button{padding:25px 60px;font-size:22px;background:#0f0;color:#000;border:none;border-radius:12px;margin:10px}
+video{width:100%;max-width:640px;border:3px solid #0f0;margin-top:20px}
+#log{background:#111;border:2px solid #0f0;padding:15px;margin-top:20px;text-align:right;color:yellow;min-height:200px}
+</style>
+</head>
+<body>
+<h2>🔧 تشخيص كاميرا USB</h2>
+<button id="btn">1. اضغط هنا</button>
+<video id="v" autoplay playsinline muted></video>
+<div id="log"></div>
+
+<script>
+const log = t => document.getElementById('log').innerHTML += t + '<br>';
+const btn = document.getElementById('btn');
+const v = document.getElementById('v');
+
+btn.onclick = async () => {
+  btn.disabled = true;
+  log('1. بنطلب كاميرا "أي شي" بدون شروط...');
+
+  try {
+    // أول شي: نطلب كاميرا ساي عشان كروم يدي صلاحية
+    const temp = await navigator.mediaDevices.getUserMedia({video:true});
+    log('2. كروم وافق على الكاميرا ✅');
+    temp.getTracks().forEach(t=>t.stop()); // نقفلها طوالي
+
+    log('3. هسي بنفتش الكاميرات...');
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d=>d.kind==='videoinput');
+
+    log(4. لقيت ${cams.length} كاميرا:);
+    cams.forEach((c,i)=> log(- ${i+1}: ${c.label || 'كاميرا بدون اسم'}));
+
+    if(cams.length===0){log('❌ ما في كاميرات أصلاً'); return}
+
+    log('5. بنشغل أول كاميرا لقيناها...');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {deviceId: cams[0].deviceId}
+    });
+
+    v.srcObject = stream;
+    await v.play();
+    log('6. اشتغلت الكاميرا 🔥 لو شايف نفسك معناها نجحنا');
+    btn.style.display='none';
+
+  } catch(e) {
+    log('❌ وقعنا في: ' + e.name);
+    log('التفاصيل: ' + e.message);
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
