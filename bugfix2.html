@@ -1,0 +1,110 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLS Camera USB</title>
+<style>
+body { margin:0; background:#000; overflow:hidden; color:#0f0; font-family:monospace }
+video, canvas { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover }
+#msg { position:absolute; top:20px; left:0; width:100%; text-align:center; color:#0f0; font-size:18px; z-index:10 }
+#start, select { position:absolute; bottom:160px; left:50%; transform:translateX(-50%); padding:18px 40px; font-size:18px; background:#0f0; color:#000; border:none; border-radius:10px; z-index:20 }
+select { bottom:100px; display:none; width:80%; max-width:400px }
+#logBox { position:absolute; bottom:0; left:0; width:100%; max-height:90px; background:rgba(17,17,17,0.9); border-top:2px solid #0f0; padding:8px; text-align:right; font-size:12px; color:yellow; overflow-y:auto; z-index:20 }
+.step{margin:2px 0} .ok{color:#0f0} .err{color:#ff5555}
+</style>
+</head>
+<body>
+<div id="msg">اختار كاميرتك واضغط تشغيل</div>
+<button id="start">1. جيب الكاميرات</button>
+<select id="camSelect"></select>
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+<div id="logBox"><div class="step">جاهز...</div></div>
+
+<script type="importmap">
+{"imports": {"mediapipe": "https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/+esm"}}
+</script>
+
+<script type="module">
+import {Pose, POSE_CONNECTIONS} from 'mediapipe';
+import {drawConnectors, drawLandmarks} from 'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466861/+esm';
+import {Camera} from 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466861/+esm';
+
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const msg = document.getElementById('msg');
+const logBox = document.getElementById('logBox');
+const btn = document.getElementById('start');
+const select = document.getElementById('camSelect');
+
+function addLog(t, c='step'){const d=document.createElement('div');d.className='step '+c;d.textContent=t;logBox.appendChild(d);logBox.scrollTop=logBox.scrollHeight}
+
+const pose = new Pose({locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${f}`});
+pose.setOptions({modelComplexity:0,smoothLandmarks:true,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+pose.onResults(r=>{
+  msg.style.display='none';
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(r.poseLandmarks){
+    drawConnectors(ctx,r.poseLandmarks,POSE_CONNECTIONS,{color:'#00FF00',lineWidth:3});
+    drawLandmarks(ctx,r.poseLandmarks,{color:'#FF0000',lineWidth:2,radius:3});
+  }
+});
+
+let cameraList = [];
+
+btn.onclick = async () => {
+  try {
+    if(btn.innerText.includes('جيب الكاميرات')){
+      addLog('1. بفتش الكاميرات المتاحة...', 'ok');
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      cameraList = devices.filter(d=>d.kind==='videoinput');
+      
+      if(cameraList.length===0){addLog('ما لقيت أي كاميرا!', 'err'); return}
+      
+      select.innerHTML = '';
+      cameraList.forEach((cam,i)=>{
+        const opt = document.createElement('option');
+        opt.value = cam.deviceId;
+        opt.text = cam.label || كاميرا ${i+1};
+        select.appendChild(opt);
+      });
+      select.style.display='block';
+      btn.innerText = '2. شغل الكاميرا المختارة';
+      addLog(2. لقيت ${cameraList.length} كاميرا - اختار من القائمة, 'ok');
+      return;
+    }
+
+    btn.disabled = true;
+    const deviceId = select.value;
+    addLog('3. بشغل الكاميرا: ' + select.options[select.selectedIndex].text, 'ok');
+    
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {deviceId: {exact: deviceId}, width:{ideal:1280}, height:{ideal:720}}
+    });
+    addLog('4. الكاميرا اشتغلت 📷', 'ok');
+    
+    video.srcObject = stream;
+    await video.play();
+    addLog('5. الفيديو شغال... ببدأ MediaPipe', 'ok');
+    
+    const camera = new Camera(video, {
+      onFrame: async () => { await pose.send({image: video}); },
+      width: 1280, height: 720
+    });
+    camera.start();
+    addLog('6. شغال فل ✅ حرك يدك', 'ok');
+    btn.style.display='none'; select.style.display='none';
+
+  } catch(err) {
+    addLog('خطأ: ' + err.name, 'err');
+    addLog(err.message, 'err');
+    btn.disabled = false;
+    console.error(err);
+  }
+};
+</script>
+</body>
+</html>
