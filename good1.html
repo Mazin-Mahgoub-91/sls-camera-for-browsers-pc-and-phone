@@ -1,0 +1,82 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>SLS Final Win7</title>
+<style>
+body{margin:0;background:#000;color:#0f0;font-family:tahoma;text-align:center;padding:20px}
+button{padding:25px 50px;font-size:20px;background:#0f0;color:#000;border:none;border-radius:15px;cursor:pointer;font-weight:bold}
+video{width:640px;height:480px;border:4px solid #0f0;margin-top:20px;background:#111}
+#log{background:#111;border:2px solid #0f0;padding:15px;margin-top:20px;text-align:right;color:yellow;min-height:200px;font-size:15px}
+</style>
+</head>
+<body>
+<h2>🎯 تشغيل Apex على ويندوز 7 32bit</h2>
+<button onclick="start()">اضغط هنا لتشغيل الكاميرا</button>
+<video id="v" autoplay playsinline muted></video>
+<canvas id="c" width="640" height="480" style="display:none"></canvas>
+<div id="log">1. اقفل ManyCam ✓<br>2. اضغط الزر تحت<br></div>
+
+<script type="module">
+import {HandLandmarker, FilesetResolver} from "https://cdn.skypack.dev/@mediapipe/tasks-vision@0.10.3";
+
+const log = t => document.getElementById('log').innerHTML += t + '<br>';
+const video = document.getElementById('v');
+let handLandmarker;
+
+async function start(){
+  log('=== بدينا ===');
+
+  try{
+    // 1. نطلب الكاميرا بدقة 640x480 بالضبط زي ما طلعت في الاختبار
+    log('1. بطلب الكاميرا 640x480...');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: {exact: 640},
+        height: {exact: 480},
+        frameRate: {max: 10} // الكاميرا 6 FPS بس
+      }
+    });
+
+    video.srcObject = stream;
+    await video.play();
+    log('2. الفيديو اشتغل ✅ شايف صورتك؟');
+
+    // 2. نحمل MediaPipe
+    log('3. بحمل MediaPipe...');
+    const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+      },
+      runningMode: "VIDEO",
+      numHands: 1
+    });
+    log('4. MediaPipe جاهز ✅');
+
+    // 3. نبدأ التتبع
+    let lastTime = -1;
+    function predict(){
+      const time = performance.now();
+      if(video.currentTime!== lastTime){
+        const result = handLandmarker.detectForVideo(video, time);
+        if(result.landmarks.length > 0){
+          log('5. يد مكتشفة! 🎉 العداد: '+result.landmarks[0].length+' نقطة', 'ok');
+        }
+        lastTime = video.currentTime;
+      }
+      requestAnimationFrame(predict);
+    }
+    predict();
+
+  }catch(e){
+    log('خطأ: '+e.name+' - '+e.message, 'err');
+    if(e.name === 'OverconstrainedError'){
+      log('جرب تغير exact لـ ideal في الكود', 'err');
+    }
+  }
+}
+window.start = start;
+</script>
+</body>
+</html>
