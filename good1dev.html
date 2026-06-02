@@ -1,0 +1,74 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>SLS Pose Skeleton</title>
+<style>
+body{margin:0;background:#000;color:#0f0;font-family:tahoma;text-align:center;padding:20px}
+button{padding:25px 50px;font-size:20px;background:#0f0;color:#000;border:none;border-radius:15px;cursor:pointer;font-weight:bold}
+#container{position:relative;display:inline-block}
+video, canvas{width:640px;height:480px;border:4px solid #0f0}
+canvas{position:absolute;top:0;left:0}
+#log{background:#111;border:2px solid #0f0;padding:15px;margin-top:20px;text-align:right;color:yellow;min-height:150px}
+</style>
+</head>
+<body>
+<h2>💀 الهيكل العظمي شغال على ويندوز 7</h2>
+<button onclick="start()">شغل الهيكل</button>
+<div id="container">
+  <video id="v" autoplay playsinline muted></video>
+  <canvas id="c" width="640" height="480"></canvas>
+</div>
+<div id="log">اضغط الزر وقيف قدام الكاميرا<br></div>
+
+<script type="module">
+import {PoseLandmarker, FilesetResolver, DrawingUtils} from "https://cdn.skypack.dev/@mediapipe/tasks-vision@0.10.3";
+
+const log = t => document.getElementById('log').innerHTML += t + '<br>';
+const video = document.getElementById('v');
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let poseLandmarker, drawingUtils;
+
+async function start(){
+  log('1. بفتح الكاميرا 640x480...');
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {width: {exact: 640}, height: {exact: 480}, frameRate: {max: 10}}
+  });
+  video.srcObject = stream;
+  await video.play();
+  log('2. الكاميرا اشتغلت ✅');
+
+  log('3. بحمل موديل الهيكل العظمي...');
+  const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+
+  poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+    },
+    runningMode: "VIDEO",
+    numPoses: 1
+  });
+  drawingUtils = new DrawingUtils(ctx);
+  log('4. الموديل جاهز ✅ ابعد شوية من الكاميرا');
+
+  function predict(){
+    ctx.clearRect(0,0,640,480);
+    const time = performance.now();
+    const result = poseLandmarker.detectForVideo(video, time);
+
+    if(result.landmarks.length > 0){
+      // ارسم الهيكل
+      drawingUtils.drawLandmarks(result.landmarks[0], {color: '#0f0', lineWidth: 3});
+      drawingUtils.drawConnectors(result.landmarks[0], PoseLandmarker.POSE_CONNECTIONS, {color: '#ff0', lineWidth: 2});
+      log('5. جسم مكتشف 💀 النقاط: '+result.landmarks[0].length, 'ok');
+    }
+    requestAnimationFrame(predict);
+  }
+  predict();
+}
+window.start = start;
+</script>
+</body>
+</html>
