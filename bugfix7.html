@@ -1,0 +1,63 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>SLS Opera Camera Fix</title>
+<style>
+body{margin:0;background:#000;color:#0f0;font-family:tahoma;text-align:center;padding:20px}
+button{padding:20px 40px;font-size:18px;background:#0f0;color:#000;border:none;border-radius:10px;margin:5px;cursor:pointer}
+video{width:100%;max-width:800px;border:3px solid #0f0;margin-top:20px}
+#log{background:#111;border:2px solid #0f0;padding:15px;margin-top:20px;text-align:right;color:yellow;min-height:250px;font-size:14px}
+</style>
+</head>
+<body>
+<h2>🔧 إصلاح كاميرا Apex في أوبرا</h2>
+<button onclick="tryCamera(1)">المحاولة 1: كاميرا ساي</button>
+<button onclick="tryCamera(2)">المحاولة 2: دقة واطية</button>
+<button onclick="tryCamera(3)">المحاولة 3: بدون deviceId</button>
+<button onclick="listCams()">جيب أسماء الكاميرات</button>
+<video id="v" autoplay playsinline muted></video>
+<div id="log"></div>
+
+<script>
+const log = t => {
+  document.getElementById('log').innerHTML += t + '<br>';
+  console.log(t);
+}
+
+async function listCams(){
+  log('=== بفتش الكاميرات ===');
+  try{
+    // لازم صلاحية أول عشان الأسماء تظهر
+    await navigator.mediaDevices.getUserMedia({video:true});
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d=>d.kind==='videoinput');
+    log(لقيت ${cams.length} كاميرا:);
+    cams.forEach((c,i)=> log(${i+1}. ${c.label} | ID: ${c.deviceId.slice(0,20)}...));
+  }catch(e){log('خطأ: '+e.name)}
+}
+
+async function tryCamera(num){
+  const v = document.getElementById('v');
+  log(=== المحاولة ${num} ===);
+  
+  let constraints;
+  if(num===1) constraints = {video: true}; // أبسط شي
+  if(num===2) constraints = {video: {width:320, height:240}}; // دقة واطية عشان Apex
+  if(num===3) constraints = {video: {facingMode: 'user'}}; // كاميرا أمامية وهمية
+  
+  try{
+    log('بطلب: '+JSON.stringify(constraints));
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    log('نجحت المحاولة '+num+' ✅✅', 'ok');
+    v.srcObject = stream;
+    await v.play();
+    log('الفيديو شغال! لو شايف صورتك معناها المشكلة اتحلت');
+    return;
+  }catch(e){
+    log('فشلت: '+e.name+' - '+e.message, 'err');
+  }
+}
+</script>
+</body>
+</html>
